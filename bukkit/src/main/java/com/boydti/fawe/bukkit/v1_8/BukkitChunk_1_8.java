@@ -125,8 +125,7 @@ public class BukkitChunk_1_8 extends CharFaweChunk<Chunk, BukkitQueue18R3> {
             HashSet<UUID> entsToRemove = this.getEntityRemoves();
             if (!entsToRemove.isEmpty()) {
                 synchronized (BukkitQueue_0.class) {
-                    for (int i = 0; i < entities.length; i++) {
-                        Collection<Entity> ents = entities[i];
+                    for (Collection<Entity> ents : entities) {
                         if (ents.isEmpty()) {
                             Entity[] entsArr = ents.toArray(new Entity[ents.size()]);
                             for (Entity entity : entsArr) {

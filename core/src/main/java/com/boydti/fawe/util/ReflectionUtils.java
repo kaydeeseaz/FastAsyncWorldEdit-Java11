@@ -1,6 +1,8 @@
 package com.boydti.fawe.util;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
@@ -10,8 +12,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
-import sun.reflect.ConstructorAccessor;
-import sun.reflect.FieldAccessor;
 import sun.reflect.ReflectionFactory;
 
 /**
@@ -74,7 +74,7 @@ public class ReflectionUtils {
             // 6. Clean enum cache
             cleanEnumCache(enumType);
             return newValue;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -106,53 +106,49 @@ public class ReflectionUtils {
     }
 
     private static Object makeEnum(Class<?> enumClass, String value, int ordinal,
-                                   Class<?>[] additionalTypes, Object[] additionalValues) throws Exception {
+                                   Class<?>[] additionalTypes, Object[] additionalValues) throws Throwable {
         Object[] parms = new Object[additionalValues.length + 2];
         parms[0] = value;
-        parms[1] = Integer.valueOf(ordinal);
+        parms[1] = ordinal;
         System.arraycopy(additionalValues, 0, parms, 2, additionalValues.length);
-        return enumClass.cast(getConstructorAccessor(enumClass, additionalTypes).newInstance(parms));
+
+        return enumClass.cast(getConstructorAccessor(enumClass, additionalTypes).invokeWithArguments(parms));
     }
 
-    private static ConstructorAccessor getConstructorAccessor(Class<?> enumClass,
-                                                              Class<?>[] additionalParameterTypes) throws NoSuchMethodException {
+    private static MethodHandle getConstructorAccessor(Class<?> enumClass,
+                                                       Class<?>[] additionalParameterTypes) throws NoSuchMethodException, IllegalAccessException {
         Class<?>[] parameterTypes = new Class[additionalParameterTypes.length + 2];
         parameterTypes[0] = String.class;
         parameterTypes[1] = int.class;
-        System.arraycopy(additionalParameterTypes, 0,
-                parameterTypes, 2, additionalParameterTypes.length);
-        return ReflectionFactory.getReflectionFactory().newConstructorAccessor(enumClass.getDeclaredConstructor(parameterTypes));
+        System.arraycopy(additionalParameterTypes, 0, parameterTypes, 2, additionalParameterTypes.length);
+
+        Constructor<?> constructor = enumClass.getDeclaredConstructor(parameterTypes);
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(enumClass, MethodHandles.lookup());
+        return lookup.unreflectConstructor(constructor);
     }
 
     public static void setFailsafeFieldValue(Field field, Object target, Object value)
             throws NoSuchFieldException, IllegalAccessException {
-
-        // let's make the field accessible
+        // Ensure the field is accessible
         field.setAccessible(true);
 
-        // next we change the modifier in the Field instance to
-        // not be final anymore, thus tricking reflection into
-        // letting us modify the static final field
+        // Remove the `final` modifier if necessary
         if (Modifier.isFinal(field.getModifiers())) {
             try {
-                Field lookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
-                lookupField.setAccessible(true);
+                Field modifiersField = Field.class.getDeclaredField("modifiers");
+                modifiersField.setAccessible(true);
 
-                // blank out the final bit in the modifiers int
-                ((MethodHandles.Lookup) lookupField.get(null))
-                        .findSetter(Field.class, "modifiers", int.class)
-                        .invokeExact(field, field.getModifiers() & ~Modifier.FINAL);
+                // Update the modifiers field using VarHandle
+                MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(Field.class, MethodHandles.lookup());
+                VarHandle varHandle = lookup.unreflectVarHandle(modifiersField);
+                varHandle.set(field, field.getModifiers() & ~Modifier.FINAL);
             } catch (Throwable e) {
-                e.printStackTrace();
+                throw new IllegalStateException("Unable to modify final modifier", e);
             }
         }
 
-        try {
-            FieldAccessor fa = ReflectionFactory.getReflectionFactory().newFieldAccessor(field, false);
-            fa.set(target, value);
-        } catch (NoSuchMethodError error) {
-            field.set(target, value);
-        }
+        // Set the field value
+        field.set(target, value);
     }
 
     private static void blankField(Class<?> enumClass, String fieldName)

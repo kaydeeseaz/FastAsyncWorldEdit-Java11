@@ -1,16 +1,16 @@
 package com.boydti.fawe.bukkit.v0;
 
-import sun.misc.SharedSecrets;
-
 public class ChunkListener_8 extends ChunkListener {
 
     @Override
     protected int getDepth(Exception ex) {
-        return SharedSecrets.getJavaLangAccess().getStackTraceDepth(ex);
+        // Use the standard API to get the depth of the stack trace
+        return ex.getStackTrace().length;
     }
 
     @Override
     protected StackTraceElement getElement(Exception ex, int index) {
-        return SharedSecrets.getJavaLangAccess().getStackTraceElement(ex, index);
+        // Use the standard API to retrieve the specific stack trace element
+        return ex.getStackTrace()[index];
     }
 }
