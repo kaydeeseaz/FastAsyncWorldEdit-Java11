@@ -35,7 +35,6 @@ import com.boydti.fawe.regions.FaweMaskManager;
 import com.boydti.fawe.util.*;
 import com.boydti.fawe.util.cui.CUI;
 import com.boydti.fawe.util.image.ImageViewer;
-import com.boydti.fawe.util.metrics.BStats;
 import com.sk89q.bukkit.util.FallbackRegistrationListener;
 import com.sk89q.worldedit.bukkit.BukkitPlayerBlockBag;
 import com.sk89q.worldedit.bukkit.BukkitWorld;
@@ -293,8 +292,6 @@ public class FaweBukkit implements IFawe, Listener {
                         for (RegisteredServiceProvider<?> provider : providers) {
                             Object instance = provider.getProvider();
 
-                            // Link it to FAWE's metrics instead
-                            BStats.linkMetrics(instance);
 
                             // Disable the other metrics
                             Bukkit.getServicesManager().unregister(service, instance);
